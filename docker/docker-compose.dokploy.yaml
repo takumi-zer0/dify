@@ -1,0 +1,14 @@
+# ファイル名: docker/docker-compose.dokploy.yaml
+services:
+  nginx:
+    # DokployのTraefikと競合しないよう、ホスト公開を消す
+    ports: []
+    # コンテナ内80番だけ見せる
+    expose:
+      - "80"
+    networks:
+      - dokploy-network
+
+networks:
+  dokploy-network:
+    external: true
