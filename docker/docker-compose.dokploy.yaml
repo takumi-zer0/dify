@@ -7,7 +7,14 @@ services:
     expose:
       - "80"
     networks:
+      - default
       - dokploy-network
+    labels:
+      - "traefik.enable=true"
+      - 'traefik.http.routers.dify.rule=Host(`dify.hyper-typer.xyz`)'
+      - "traefik.http.routers.dify.entrypoints=web"
+      - "traefik.http.services.dify.loadbalancer.server.port=80"
+      - "traefik.docker.network=dokploy-network"
 
 networks:
   dokploy-network:
