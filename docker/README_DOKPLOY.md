@@ -35,11 +35,12 @@
    - .env ファイルの内容をEnvironment Variablesとして設定
    - 各環境変数を確認・修正
 
-3. **Port Configuration**:
-   - **Add Port**: 80 (Nginx HTTP)
-   - **Add Port**: 443 (Nginx HTTPS) - オプション
-   - **Host**: 0.0.0.0
-   - **Container Port**: 80 (HTTP), 443 (HTTPS)
+3. **Port Configuration** (Cloudflare Tunnelを使用する場合):
+   - **Cloudflare Tunnel専用**: 外部ポート公開は不要
+   - **ローカルテストの場合のみ**:
+     - **Add Port**: 80 (Nginx HTTP)
+     - **Host**: 0.0.0.0
+     - **Container Port**: 80
 
 4. **Network**:
    - Network Mode: Bridge
@@ -56,19 +57,17 @@
 ### 3. Cloudflare Tunnel設定（必須）
 
 Cloudflare Tunnelを使用する場合：
-1. Cloudflare DashboardでTunnelを作成
+1. **Cloudflare Dashboard**でTunnelを作成
 2. Tunnelのドメインを `dify.hyper-typer.xyz` に設定
 3. **Public Hostnameの設定**:
    - **Domain**: `dify.hyper-typer.xyz`
-   - **Service**: `http://localhost:80`（内部URL）
+   - **Service**: `http://localhost:80` ← **重要：DokployのNginxコンテナの内部URL**
    - **Path**: `/`（空のまま）
    - **HTTP/2**: ON
    - **TLS**: ON（自動）
 4. TunnelがDokployのNginxに接続されることを確認
 
-**重要**: DokployのService設定で以下のポートを公開してください：
-- **80**: Nginx HTTPポート（Cloudflare Tunnel用）
-- **443**: Nginx HTTPSポート（オプション）
+**⚠️ 注意**: DokployのService設定ではポート80/443を公開しないでください。Cloudflare Tunnelが内部的にHTTP/HTTPSを処理します。
 
 **注意**: 環境変数ファイル（.env）で以下の設定が正しくされていることを確認してください：
 - `PLUGIN_DEBUGGING_HOST=0.0.0.0`
@@ -78,11 +77,16 @@ Cloudflare Tunnelを使用する場合：
 
 ### 4. トラブルシューティング
 
+**ポート80が既に割り当てられているエラーが発生した場合**:
+- Cloudflare Tunnelを使用する場合は、DokployのPort設定でポート80/443を公開しない
+- Docker ComposeのNginx設定で`ports`をコメントアウトし、`expose`のみ使用
+- 外部ネットワーク `dokploy-network` が競合していないか確認
+
 **404 Not Foundエラーが発生した場合**:
 - Cloudflare TunnelのPublic Hostname設定を確認
 - **Service**: `http://localhost:80` が正しく設定されているか確認
-- DokployのServiceでポート80が公開されているか確認
 - Nginxコンテナが正常に起動しているか確認
+- 内部ネットワーク通信が正常か確認
 
 **Plugin Daemonエラーが発生した場合**:
 - Plugin daemonのログを確認
@@ -101,11 +105,25 @@ Cloudflare Tunnelを使用する場合：
 
 ### 5. デプロイ
 
-1. "Deploy Service" をクリック
+1. **"Deploy Service"** をクリック
 2. サービスが正常に起動するのを待つ
-3. 各サービスのヘルスチェックが成功することを確認
+3. **各サービスのヘルスチェックが成功することを確認**:
+   - Database: `Healthy`
+   - Redis: `Started`
+   - API: `Started`
+   - Worker: `Started`
+   - Web: `Started`
+   - Nginx: `Started`
+   - Plugin Daemon: `Started`
+4. **Cloudflare Tunnelのステータスを確認**（別途設定が必要）
 
-### 6. 初期設定
+### 6. デプロイ後の確認
+
+1. **コンテナログを確認**してエラーがないかチェック
+2. **Nginxのヘルスチェック**: `http://localhost/health` で200応答を確認
+3. **Cloudflare Tunnel経由で** `https://dify.hyper-typer.xyz` にアクセスして動作確認
+
+### 7. 初期設定
 
 1. ブラウザでコンソールURLにアクセス
 2. 初期パスワードでログイン

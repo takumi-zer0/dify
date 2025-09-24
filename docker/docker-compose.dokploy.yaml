@@ -368,9 +368,13 @@ services:
       - web
     networks:
       - dokploy-network
-    ports:
-      - "${NGINX_PORT:-80}:${NGINX_PORT:-80}"
-      - "${NGINX_SSL_PORT:-443}:${NGINX_SSL_PORT:-443}"
+    # Cloudflare Tunnelを使用する場合、外部ポート公開は不要
+    # ports:
+    #   - "${NGINX_PORT:-80}:${NGINX_PORT:-80}"
+    #   - "${NGINX_SSL_PORT:-443}:${NGINX_SSL_PORT:-443}"
+    expose:
+      - "80"
+      - "443"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost/health"]
       interval: 30s
