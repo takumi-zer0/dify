@@ -1,57 +1,189 @@
 # Please do not directly edit this file. Instead, modify the .env variables related to NGINX configuration.
 
+# Define upstream servers with health checks and retry settings
+upstream api_backend {
+    server api:5001 max_fails=3 fail_timeout=30s;
+    keepalive 32;
+}
+
+upstream web_backend {
+    server web:3000 max_fails=3 fail_timeout=30s;
+    keepalive 32;
+}
+
+upstream plugin_backend {
+    server plugin_daemon:5002 max_fails=3 fail_timeout=30s;
+    keepalive 32;
+}
+
 server {
     listen ${NGINX_PORT};
     server_name ${NGINX_SERVER_NAME};
 
+    # DNS resolver configuration
     resolver 127.0.0.11 valid=30s ipv6=off;
     resolver_timeout 5s;
-    set $api_upstream api:5001;
-    set $web_upstream web:3000;
-    set $plugin_upstream plugin_daemon:5002;
 
+    # Client request limits
+    client_max_body_size ${NGINX_CLIENT_MAX_BODY_SIZE};
+    client_body_timeout 12;
+    client_header_timeout 12;
+    send_timeout ${NGINX_PROXY_SEND_TIMEOUT};
+
+    # Gzip compression
+    gzip on;
+    gzip_vary on;
+    gzip_min_length 1024;
+    gzip_proxied any;
+    gzip_comp_level 6;
+    gzip_types
+        text/plain
+        text/css
+        text/xml
+        text/javascript
+        application/json
+        application/javascript
+        application/xml+rss
+        application/atom+xml
+        image/svg+xml;
+
+    # Security headers
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "no-referrer-when-downgrade" always;
+    add_header Content-Security-Policy "default-src 'self' http: https: data: blob: 'unsafe-inline'" always;
+
+    # Health check endpoint
+    location /health {
+        access_log off;
+        return 200 "healthy\n";
+        add_header Content-Type text/plain;
+    }
+
+    # Console API endpoints
     location /console/api {
-      proxy_pass http://$api_upstream;
-      include proxy.conf;
+        proxy_pass http://api_backend;
+        include proxy.conf;
+        # Retry failed requests to backend
+        proxy_next_upstream error timeout invalid_header http_500 http_502 http_503 http_504;
+        proxy_next_upstream_tries 3;
+        proxy_next_upstream_timeout 30s;
     }
 
+    # API endpoints
     location /api {
-      proxy_pass http://$api_upstream;
-      include proxy.conf;
+        proxy_pass http://api_backend;
+        include proxy.conf;
+        # Retry failed requests to backend
+        proxy_next_upstream error timeout invalid_header http_500 http_502 http_503 http_504;
+        proxy_next_upstream_tries 3;
+        proxy_next_upstream_timeout 30s;
     }
 
+    # API v1 endpoints
     location /v1 {
-      proxy_pass http://$api_upstream;
-      include proxy.conf;
+        proxy_pass http://api_backend;
+        include proxy.conf;
+        # Retry failed requests to backend
+        proxy_next_upstream error timeout invalid_header http_500 http_502 http_503 http_504;
+        proxy_next_upstream_tries 3;
+        proxy_next_upstream_timeout 30s;
     }
 
+    # File serving endpoints
     location /files {
-      proxy_pass http://$api_upstream;
-      include proxy.conf;
+        proxy_pass http://api_backend;
+        include proxy.conf;
+        # Retry failed requests to backend
+        proxy_next_upstream error timeout invalid_header http_500 http_502 http_503 http_504;
+        proxy_next_upstream_tries 3;
+        proxy_next_upstream_timeout 30s;
     }
 
+    # Web explore endpoint
     location /explore {
-      proxy_pass http://$web_upstream;
-      include proxy.conf;
+        proxy_pass http://web_backend;
+        include proxy.conf;
+        # Retry failed requests to backend
+        proxy_next_upstream error timeout invalid_header http_500 http_502 http_503 http_504;
+        proxy_next_upstream_tries 3;
+        proxy_next_upstream_timeout 30s;
     }
 
+    # Plugin endpoints
     location /e/ {
-      proxy_pass http://$plugin_upstream;
-      proxy_set_header Dify-Hook-Url $scheme://$host$request_uri;
-      include proxy.conf;
+        proxy_pass http://plugin_backend;
+        proxy_set_header Dify-Hook-Url $scheme://$host$request_uri;
+        include proxy.conf;
+        # Retry failed requests to backend
+        proxy_next_upstream error timeout invalid_header http_500 http_502 http_503 http_504;
+        proxy_next_upstream_tries 3;
+        proxy_next_upstream_timeout 30s;
     }
 
+    # Web frontend
     location / {
-      proxy_pass http://$web_upstream;
-      include proxy.conf;
+        proxy_pass http://web_backend;
+        include proxy.conf;
+        # Retry failed requests to backend
+        proxy_next_upstream error timeout invalid_header http_500 http_502 http_503 http_504;
+        proxy_next_upstream_tries 3;
+        proxy_next_upstream_timeout 30s;
     }
+
+    # MCP endpoints
     location /mcp {
-      proxy_pass http://$api_upstream;
-      include proxy.conf;
+        proxy_pass http://api_backend;
+        include proxy.conf;
+        # Retry failed requests to backend
+        proxy_next_upstream error timeout invalid_header http_500 http_502 http_503 http_504;
+        proxy_next_upstream_tries 3;
+        proxy_next_upstream_timeout 30s;
     }
-    # placeholder for acme challenge location
+
+    # Static file serving with caching
+    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+        proxy_pass http://web_backend;
+        include proxy.conf;
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+        # Try files in order: web_backend, then fallback to error page
+        try_files $uri @web_backend;
+    }
+
+    location @web_backend {
+        proxy_pass http://web_backend;
+        include proxy.conf;
+        proxy_next_upstream error timeout invalid_header http_500 http_502 http_503 http_504;
+        proxy_next_upstream_tries 3;
+        proxy_next_upstream_timeout 30s;
+    }
+
+    # Placeholder for acme challenge location
     ${ACME_CHALLENGE_LOCATION}
 
-    # placeholder for https config defined in https.conf.template
+    # Placeholder for https config defined in https.conf.template
     ${HTTPS_CONFIG}
+
+    # Error pages
+    error_page 502 503 504 /50x.html;
+    location = /50x.html {
+        root /usr/share/nginx/html;
+        internal;
+    }
+
+    # Rate limiting (optional)
+    # limit_req_zone $binary_remote_addr zone=api:10m rate=10r/s;
+    # limit_req_zone $binary_remote_addr zone=web:10m rate=30r/s;
+
+    # location /api {
+    #     limit_req zone=api burst=20 nodelay;
+    #     # ... rest of config
+    # }
+
+    # location / {
+    #     limit_req zone=web burst=50 nodelay;
+    #     # ... rest of config
+    # }
 }
