@@ -35,20 +35,40 @@
    - .env ファイルの内容をEnvironment Variablesとして設定
    - 各環境変数を確認・修正
 
-3. **Volumes**:
+3. **Port Configuration**:
+   - **Add Port**: 80 (Nginx HTTP)
+   - **Add Port**: 443 (Nginx HTTPS) - オプション
+   - **Host**: 0.0.0.0
+   - **Container Port**: 80 (HTTP), 443 (HTTPS)
+
+4. **Network**:
+   - Network Mode: Bridge
+   - 外部ネットワーク `dokploy-network` が存在することを確認
+
+5. **Volumes**:
    - 必要なボリュームが自動的に作成されることを確認
    - データ永続化のためのボリューム設定
 
-4. **Networking**:
+6. **Networking**:
    - 外部ネットワーク `dokploy-network` が存在することを確認
    - 必要に応じてネットワーク設定を調整
 
-### 3. Cloudflare Tunnel設定（オプション）
+### 3. Cloudflare Tunnel設定（必須）
 
 Cloudflare Tunnelを使用する場合：
 1. Cloudflare DashboardでTunnelを作成
 2. Tunnelのドメインを `dify.hyper-typer.xyz` に設定
-3. TunnelがDokployのNginxに接続されることを確認
+3. **Public Hostnameの設定**:
+   - **Domain**: `dify.hyper-typer.xyz`
+   - **Service**: `http://localhost:80`（内部URL）
+   - **Path**: `/`（空のまま）
+   - **HTTP/2**: ON
+   - **TLS**: ON（自動）
+4. TunnelがDokployのNginxに接続されることを確認
+
+**重要**: DokployのService設定で以下のポートを公開してください：
+- **80**: Nginx HTTPポート（Cloudflare Tunnel用）
+- **443**: Nginx HTTPSポート（オプション）
 
 **注意**: 環境変数ファイル（.env）で以下の設定が正しくされていることを確認してください：
 - `PLUGIN_DEBUGGING_HOST=0.0.0.0`
@@ -57,6 +77,12 @@ Cloudflare Tunnelを使用する場合：
 - `PLUGIN_DIFY_INNER_API_URL=http://api:5001`
 
 ### 4. トラブルシューティング
+
+**404 Not Foundエラーが発生した場合**:
+- Cloudflare TunnelのPublic Hostname設定を確認
+- **Service**: `http://localhost:80` が正しく設定されているか確認
+- DokployのServiceでポート80が公開されているか確認
+- Nginxコンテナが正常に起動しているか確認
 
 **Plugin Daemonエラーが発生した場合**:
 - Plugin daemonのログを確認
@@ -67,6 +93,11 @@ Cloudflare Tunnelを使用する場合：
 - PostgreSQLコンテナが正常に起動していることを確認
 - データベースの初期化が完了していることを確認
 - 環境変数 `POSTGRES_PASSWORD` が正しく設定されていることを確認
+
+**サービスが起動しない場合**:
+- 各サービスのヘルスチェックが成功しているか確認
+- 依存関係（db, redis）の起動順序を確認
+- ログファイルでエラーを確認
 
 ### 5. デプロイ
 
