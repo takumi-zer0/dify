@@ -15,6 +15,9 @@ services:
       - "traefik.http.routers.dify.entrypoints=web"
       - "traefik.http.services.dify.loadbalancer.server.port=80"
       - "traefik.docker.network=dokploy-network"
+  redis:
+    command: >-
+      redis-server --save "" --appendonly no --requirepass ${REDIS_PASSWORD:-difyai123456}
 
 networks:
   dokploy-network:
