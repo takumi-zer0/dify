@@ -2,7 +2,7 @@
 services:
   nginx:
     # DokployのTraefikと競合しないよう、ホスト公開を消す
-    ports: []
+    ports: null
     # コンテナ内80番だけ見せる
     expose:
       - "80"
